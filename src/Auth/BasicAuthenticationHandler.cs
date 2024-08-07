@@ -53,13 +53,14 @@ public class BasicAuthenticationHandler : AuthenticationHandler<BasicAuthenticat
             var username = credentials[0];
             var password = credentials[1];
 
-            Logger.LogInformation("Forwarded username/password: {username} {password}. {path}",
-                username, password, this.Request.Path);
-
-            if (username != appOptions.Username && password != appOptions.Password)
+            if (username != appOptions.Username || password != appOptions.Password)
             {
+                Logger.LogError("Incorrect username/password.");
                 return Task.FromResult(AuthenticateResult.Fail("Incorrect username/password."));
             }
+
+            Logger.LogInformation("Forwarded username/password: {username} {password}. {path}",
+                username, password, this.Request.Path);
 
             var claims = new[]
             {
@@ -71,10 +72,18 @@ public class BasicAuthenticationHandler : AuthenticationHandler<BasicAuthenticat
 
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
+            Logger.LogInformation("{data}", new
+            {
+                XForwardedMethod = Request.Headers["X-Forwarded-Method"],
+                XForwardedHost = Request.Headers["X-Forwarded-Host"],
+                XForwardedUri = Request.Headers["X-Forwarded-Uri"],
+            });
+
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }
         catch
         {
+            Logger.LogError("Error Occured.Authorization failed.");
             return Task.FromResult(AuthenticateResult.Fail("Error Occured.Authorization failed."));
         }
     }

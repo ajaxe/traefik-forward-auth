@@ -1,7 +1,31 @@
+@model LoginViewModel
 @{
     ViewData["Title"] = "Login";
 }
-
 <div class="text-center">
-    <h1 class="display-4">Login</h1>
+    <div class="row">
+        <div class="col-md-4 offset-md-4 col-lg-6 offset-lg-3">
+            <h2 class="display-6">Login</h2>
+            @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+            {
+                <div class="alert alert-warning" role="alert">@Model.ErrorMessage</div>
+            }
+            <form asp-asp-controller="Login" asp-action="LoginSubmit" method="post">
+                <div class="form-floating mb-3">
+                    <input type="text" class="form-control" placeholder="name@example.com" asp-for="Username">
+                    <label for="floatingInput">Username</label>
+                </div>
+                <div class="form-floating">
+                    <input type="password" class="form-control" id="floatingPassword" placeholder="Password"
+                        asp-for="Password">
+                    <label for="floatingPassword">Password</label>
+                </div>
+                <div class="position-relative mt-2">
+                    <div class="d-flex justify-content-center">
+                        <button type="submit" class="btn btn-primary">Login</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>

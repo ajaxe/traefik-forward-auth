@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Configuration;
 
@@ -18,9 +19,9 @@ builder.Services.Configure<AppOptions>(
     builder.Configuration.GetSection(AppOptions.SectionName)
 );
 
-builder.Services.AddAuthentication(BasicAuthenticationOptions.SchemeName)
-    .AddScheme<BasicAuthenticationOptions, BasicAuthenticationHandler>(BasicAuthenticationOptions.SchemeName, null)
-    .AddCookie("Cookies", o =>
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    //.AddScheme<BasicAuthenticationOptions, BasicAuthenticationHandler>(BasicAuthenticationOptions.SchemeName, null)
+    .AddCookie(o =>
     {
         o.LoginPath = "/login";
         o.ExpireTimeSpan = TimeSpan.FromMinutes(1);
@@ -28,8 +29,11 @@ builder.Services.AddAuthentication(BasicAuthenticationOptions.SchemeName)
         o.AccessDeniedPath = "/login/AccessDenied";
         o.Cookie.Name = ".fwd-auth-custom";
         o.Cookie.IsEssential = true;
+        o.EventsType = typeof(CustomCookieAuthenticationEvents);
     });
+
 // Add services to the container.
+builder.Services.AddScoped<CustomCookieAuthenticationEvents>();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
