@@ -39,15 +39,14 @@ public class LoginController : Controller
         }
 
         var isPostLogin = TempData.Get<string>(PostLoginKey) == "true";
-        logger.LogInformation("Reading TempData - PostLoginKey. {isPostLogin}", isPostLogin);
+
         if (isPostLogin)
         {
-            logger.LogInformation("First time request redirect: {redirect}", redirect);
+            logger.LogInformation("First time request redirect: {redirect}, setting 'PostLoginKey false", redirect);
             TempData.Put(PostLoginKey, "false");
             return Redirect(redirect!);
         }
 
-        logger.LogInformation("Request redirect: {redirect}", redirect);
         return Ok();
     }
 
