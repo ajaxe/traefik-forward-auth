@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Configuration;
 
@@ -18,6 +20,13 @@ builder.Configuration.GetSection(AppOptions.SectionName)
 builder.Services.Configure<AppOptions>(
     builder.Configuration.GetSection(AppOptions.SectionName)
 );
+
+if (builder.Environment.IsProduction())
+{
+    builder.Services.AddDataProtection()
+        //.SetApplicationName("TraefikForwardAuth")
+        .PersistKeysToFileSystem(new DirectoryInfo("/dpapi-keys/"));
+}
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     //.AddScheme<BasicAuthenticationOptions, BasicAuthenticationHandler>(BasicAuthenticationOptions.SchemeName, null)

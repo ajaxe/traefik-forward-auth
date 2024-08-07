@@ -15,9 +15,6 @@ RUN apk add bash icu-libs krb5-libs libgcc libintl libssl3 libstdc++ zlib curl
 WORKDIR /home/app/
 COPY --from=builder /home/app/published .
 
-RUN chown app:app -R /home/app
-USER app
-
 ENV ASPNETCORE_URLS=http://*:5000 \
     ASPNETCORE_ENVIRONMENT=Production
 
