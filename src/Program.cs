@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Configuration;
+using TraefikForwardAuth.Database;
 
 const string EnvVarPrefix = "APP_";
 
@@ -10,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOptions();
 builder.Configuration
+    .AddJsonFile("secrets.json", optional: true, reloadOnChange: false)
     .AddEnvironmentVariables(prefix: EnvVarPrefix);
 
 builder.Services.AddHealthChecks();
@@ -21,10 +24,15 @@ builder.Services.Configure<AppOptions>(
     builder.Configuration.GetSection(AppOptions.SectionName)
 );
 
+builder.Services.AddDbContext<AppDbContext>(
+    o => o.UseMongoDB(appOptions.MongoDbConnection, appOptions.DatabaseName)
+);
+builder.Services.AddTransient<IHostedApplicationService, HostedApplicationService>();
+
 if (builder.Environment.IsProduction())
 {
     builder.Services.AddDataProtection()
-        //.SetApplicationName("TraefikForwardAuth")
+        .SetApplicationName("TraefikForwardAuth")
         .PersistKeysToFileSystem(new DirectoryInfo("/dpapi-keys/"));
 }
 
@@ -33,7 +41,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     .AddCookie(o =>
     {
         o.LoginPath = "/login";
-        o.ExpireTimeSpan = TimeSpan.FromMinutes(1);
+        o.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+        o.SlidingExpiration = true;
         o.ReturnUrlParameter = "returnUrl";
         o.AccessDeniedPath = "/login/AccessDenied";
         o.Cookie.Name = ".fwd-auth-custom";

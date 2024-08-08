@@ -1,0 +1,29 @@
+@model HostedApplicationViewModel
+@{
+    ViewData["Title"] = "Service Applications";
+}
+
+<table class="table">
+    <thead>
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">Service Name</th>
+            <th scope="col">Token</th>
+            <th scope="col">URL</th>
+            <th scope="col">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var app in Model.HostedApps)
+        {
+            <tr>
+                <th scope="row">@app.Id</th>
+                <td>@app.Name</td>
+                <td>@app.ServiceToken</td>
+                <td>@app.ServiceUrl</td>
+                <td>@app.Active</td>
+            </tr>
+        }
+
+    </tbody>
+</table>
