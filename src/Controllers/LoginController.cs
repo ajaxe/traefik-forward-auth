@@ -1,10 +1,11 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using MongoDB.Bson;
+using TraefikForwardAuth.Helpers;
 using TraefikForwardAuth.Models;
 
 namespace TraefikForwardAuth.Controllers;
@@ -25,16 +26,31 @@ public class LoginController : Controller
         var vm = TempData.Get<LoginViewModel>(LoginErrorKey) ?? new LoginViewModel();
         if (!string.IsNullOrWhiteSpace(returnUrl))
         {
-            TempData.Put<string>(ReturnUrlKey, returnUrl);
+            TempData.Put(ReturnUrlKey, returnUrl);
         }
         return View(vm);
     }
 
     [Authorize]
-    public IActionResult Check(string redirect)
+    public async Task<IActionResult> Check(Guid token,
+        [FromServices] IAuthService authService)
     {
         if (!this.User.Identity!.IsAuthenticated)
         {
+            logger.LogInformation("User is not authenticated");
+            return Forbid();
+        }
+
+        string serviceUrl = await authService.AuthCheck(new AuthCheckData
+        {
+            ServiceToken = token,
+            Claims = User.Claims,
+        });
+
+        if (string.IsNullOrWhiteSpace(serviceUrl))
+        {
+            //logger.LogInformation("Invalid service, token: {token} active: {active}",
+            //token, existing?.Active);
             return Forbid();
         }
 
@@ -42,9 +58,9 @@ public class LoginController : Controller
 
         if (isPostLogin)
         {
-            logger.LogInformation("First time request redirect: {redirect}, setting 'PostLoginKey false", redirect);
+            logger.LogInformation("First time request redirect: {redirect}, setting 'PostLoginKey false", token);
             TempData.Put(PostLoginKey, "false");
-            return Redirect(redirect!);
+            return Redirect(serviceUrl);
         }
 
         return Ok();
@@ -52,7 +68,8 @@ public class LoginController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> LoginSubmit(LoginBindingModel model)
+    public async Task<IActionResult> LoginSubmit(LoginBindingModel model,
+        [FromServices] IAuthService authService)
     {
         if (!TryValidateModel(model))
         {
@@ -60,30 +77,18 @@ public class LoginController : Controller
             return Redirect("Index");
         }
         var returnUrl = TempData.Get<string>(ReturnUrlKey);
-        if (!string.IsNullOrWhiteSpace(returnUrl) && model.Username == "admin")
+
+        var result = await authService.Authenticate(model.Username, model.Password);
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && result.Success)
         {
-            var authProperties = new AuthenticationProperties
-            {
-                AllowRefresh = true,
-                IsPersistent = true,
-                IssuedUtc = DateTimeOffset.UtcNow,
-            };
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, model.Username),
-                new Claim(ClaimTypes.Role, "Administrator"),
-            };
-
-            var claimsIdentity = new ClaimsIdentity(
-                claims, CookieAuthenticationDefaults.AuthenticationScheme);
-
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(claimsIdentity),
-                authProperties);
+                result.Principal,
+                result.AuthProperties);
 
-            logger.LogInformation("Setting 'PostLoginKey' to 1");
+            logger.LogInformation("Setting 'PostLoginKey' to 1. User authenticated: {user}",
+                model.Username);
             TempData.Put(PostLoginKey, "true");
 
             return LocalRedirect(returnUrl);

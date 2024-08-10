@@ -28,6 +28,7 @@ builder.Services.AddDbContext<AppDbContext>(
     o => o.UseMongoDB(appOptions.MongoDbConnection, appOptions.DatabaseName)
 );
 builder.Services.AddTransient<IHostedApplicationService, HostedApplicationService>();
+builder.Services.AddTransient<IAuthService, AppAuthService>();
 
 if (builder.Environment.IsProduction())
 {

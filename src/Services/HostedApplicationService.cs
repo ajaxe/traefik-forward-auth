@@ -15,4 +15,15 @@ public class HostedApplicationService : IHostedApplicationService
     {
         return await dbContext.HostedApplications.AsNoTracking().ToListAsync();
     }
+
+    public async Task<HostedApplication?> GetByServicetoken(Guid serviceToken)
+    {
+        if (serviceToken == default)
+        {
+            return null;
+        }
+
+        return await dbContext.HostedApplications.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.ServiceToken == serviceToken);
+    }
 }
