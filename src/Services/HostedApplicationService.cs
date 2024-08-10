@@ -1,5 +1,6 @@
 
 using Microsoft.EntityFrameworkCore;
+using MongoDB.Bson;
 
 namespace TraefikForwardAuth.Services;
 
@@ -16,7 +17,7 @@ public class HostedApplicationService : IHostedApplicationService
         return await dbContext.HostedApplications.AsNoTracking().ToListAsync();
     }
 
-    public async Task<HostedApplication?> GetByServicetoken(Guid serviceToken)
+    public async Task<HostedApplication?> GetByServiceToken(string serviceToken)
     {
         if (serviceToken == default)
         {

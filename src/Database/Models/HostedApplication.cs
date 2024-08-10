@@ -10,7 +10,8 @@ public class HostedApplication
     public ObjectId Id { get; set; }
 
     public string Name { get; set; } = default!;
-    public Guid ServiceToken { get; set; }
+
+    public string ServiceToken { get; set; } = default!;
     public string ServiceUrl { get; set; } = default!;
     public bool Active { get; set; }
 }

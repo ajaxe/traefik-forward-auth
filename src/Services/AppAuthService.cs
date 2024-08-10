@@ -54,14 +54,21 @@ public class AppAuthService : IAuthService
 
     public async Task<string> AuthCheck(AuthCheckData authCheckData)
     {
-        var existingService = await appService.GetByServicetoken(authCheckData.ServiceToken);
+        var existingService = await appService.GetByServiceToken(authCheckData.ServiceToken);
         if (existingService is null || !existingService.Active)
         {
-            logger.LogInformation("Invalid service. {data}", authCheckData);
+            logger.LogInformation("Invalid service. {@data}",
+            new
+            {
+                ServiceActive = existingService?.Active,
+                authCheckData.ServiceToken,
+                ClaimCount = authCheckData.Claims.Count(),
+                Claims = authCheckData.Claims.Select(c => new { c.Type, c.Value })
+            });
             return string.Empty;
         }
 
-        logger.LogInformation("Found service. {data}", existingService);
+        logger.LogInformation("Found service. {@data}", existingService);
 
         var allowedAppIds = GetClaimAppIds(authCheckData.Claims);
 

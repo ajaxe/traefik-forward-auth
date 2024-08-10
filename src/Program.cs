@@ -1,14 +1,15 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Configuration;
-using TraefikForwardAuth.Database;
 
 const string EnvVarPrefix = "APP_";
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSerilog((s, lc) => lc.ReadFrom.Configuration(builder.Configuration));
 
 builder.Services.AddOptions();
 builder.Configuration

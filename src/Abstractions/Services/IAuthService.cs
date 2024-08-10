@@ -20,6 +20,6 @@ public class AuthenticationResult
 
 public class AuthCheckData
 {
-    public Guid ServiceToken { get; internal set; }
+    public string ServiceToken { get; internal set; }
     public IEnumerable<Claim> Claims { get; internal set; }
 }

@@ -32,7 +32,7 @@ public class LoginController : Controller
     }
 
     [Authorize]
-    public async Task<IActionResult> Check(Guid token,
+    public async Task<IActionResult> Check(string token,
         [FromServices] IAuthService authService)
     {
         if (!this.User.Identity!.IsAuthenticated)
