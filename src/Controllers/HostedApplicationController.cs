@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TraefikForwardAuth.Models;
 
 namespace TraefikForwardAuth.Controllers;
 
+[Authorize]
 public class HostedApplicationController : Controller
 {
     private readonly IHostedApplicationService hostedAppService;
