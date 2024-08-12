@@ -133,6 +133,11 @@ public class AppAuthService : IAuthService
         {
             return existingService.ServiceUrl;
         }
+        else
+        {
+            logger.LogInformation("No application id match, {@AllowedAppId} & {@ExistngAppId}",
+                allowedAppIds, serviceId);
+        }
 
         return string.Empty;
     }

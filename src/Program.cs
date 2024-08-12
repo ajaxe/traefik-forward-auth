@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Configuration;
+using TraefikForwardAuth.Helpers;
 
 const string EnvVarPrefix = "APP_";
 
@@ -63,6 +64,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 // Add services to the container.
 builder.Services.AddScoped<CustomCookieAuthenticationEvents>();
 builder.Services.AddControllersWithViews();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
 

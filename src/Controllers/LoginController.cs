@@ -49,8 +49,7 @@ public class LoginController : Controller
 
         if (string.IsNullOrWhiteSpace(serviceUrl))
         {
-            //logger.LogInformation("Invalid service, token: {token} active: {active}",
-            //token, existing?.Active);
+            logger.LogInformation("Invalid {@ServiceUrl} for {@Token}, returning forbidden", serviceUrl, token);
             return Forbid();
         }
 
