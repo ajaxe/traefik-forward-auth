@@ -16,7 +16,7 @@ public class AppUser
     public string Password { get; set; } = default!;
     public bool Active { get; set; }
     public List<AppUserApplication> Applications { get; set; }
-    public List<string> Roles { get; set; }
+    public List<string>? Roles { get; set; }
 }
 
 public class AppUserApplication

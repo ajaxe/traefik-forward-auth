@@ -31,6 +31,18 @@ public class LoginController : Controller
         return View(vm);
     }
 
+    public IActionResult AccessDenied()
+    {
+        return View();
+    }
+
+    public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme);
+        return RedirectToAction("Index", "Home");
+    }
+
     [Authorize]
     public async Task<IActionResult> Check(string token,
         [FromServices] IAuthService authService)

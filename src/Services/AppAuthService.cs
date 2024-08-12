@@ -180,7 +180,7 @@ public class AppAuthService : IAuthService
                                                     .ToJson()),
             };
 
-        if (existing.Roles.Any())
+        if (existing.Roles?.Any() ?? false)
         {
             claims.AddRange(existing.Roles
                             .Select(r => new Claim(ClaimTypes.Role, r)));
