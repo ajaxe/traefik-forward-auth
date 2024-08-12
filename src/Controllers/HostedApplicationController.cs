@@ -4,7 +4,7 @@ using TraefikForwardAuth.Models;
 
 namespace TraefikForwardAuth.Controllers;
 
-[Authorize]
+[Authorize(Roles = "Administrator")]
 public class HostedApplicationController : Controller
 {
     private readonly IHostedApplicationService hostedAppService;

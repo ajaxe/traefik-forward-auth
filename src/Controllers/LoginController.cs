@@ -75,11 +75,11 @@ public class LoginController : Controller
             TempData.Put(LoginErrorKey, model.Error("Username and password are required"));
             return Redirect("Index");
         }
-        var returnUrl = TempData.Get<string>(ReturnUrlKey);
+        var returnUrl = TempData.Get<string>(ReturnUrlKey) ?? "/";
 
         var result = await authService.Authenticate(model.Username, model.Password);
 
-        if (!string.IsNullOrWhiteSpace(returnUrl) && result.Success)
+        if (result.Success)
         {
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,

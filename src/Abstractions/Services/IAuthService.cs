@@ -8,6 +8,8 @@ public interface IAuthService
 {
     Task<string> AuthCheck(AuthCheckData authCheckData);
     Task<AuthenticationResult> Authenticate(string username, string password);
+
+    Task<bool> ValidatePrincipalRefererUrl(IEnumerable<Claim> claims, string? referer);
 }
 
 public class AuthenticationResult

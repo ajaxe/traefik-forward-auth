@@ -1,4 +1,3 @@
-using System.Runtime.Intrinsics.Arm;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -8,7 +7,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Bson;
 using TraefikForwardAuth.Helpers;
-using ZstdSharp.Unsafe;
 
 namespace TraefikForwardAuth.Services;
 
@@ -70,6 +68,35 @@ public class AppAuthService : IAuthService
                 Success = false,
             };
         }
+    }
+
+    public async Task<bool> ValidatePrincipalRefererUrl(IEnumerable<Claim> claims, string? referer)
+    {
+        if (string.IsNullOrWhiteSpace(referer))
+        {
+            logger.LogInformation("Invalid referer");
+            return false;
+        }
+
+        var appIds = GetClaimAppIds(claims);
+        if (!appIds.Any())
+        {
+            logger.LogInformation("Missing claim 'AppIds'");
+            return false;
+        }
+
+        var refererUri = new Uri(referer);
+
+        IEnumerable<HostedApplication> apps = await appService.GetApplications(appIds);
+
+        var appUris = apps.Select(a => new Uri(a.ServiceUrl).AbsoluteUri);
+
+        logger.LogInformation("Matching URI. {@RefererUri} with {@AppURI}",
+            refererUri.AbsoluteUri, appUris);
+
+        var result = appUris.Any(a => a == refererUri.AbsoluteUri);
+
+        return result;
     }
 
     private bool ValidatePassword(AppUser? existing, string password)
@@ -152,6 +179,12 @@ public class AppAuthService : IAuthService
                                                     .Select(a => a.HostAppId.ToString())
                                                     .ToJson()),
             };
+
+        if (existing.Roles.Any())
+        {
+            claims.AddRange(existing.Roles
+                            .Select(r => new Claim(ClaimTypes.Role, r)));
+        }
 
         var claimsIdentity = new ClaimsIdentity(
             claims, CookieAuthenticationDefaults.AuthenticationScheme);

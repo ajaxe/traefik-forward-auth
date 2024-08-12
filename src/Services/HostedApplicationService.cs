@@ -17,6 +17,14 @@ public class HostedApplicationService : IHostedApplicationService
         return await dbContext.HostedApplications.AsNoTracking().ToListAsync();
     }
 
+    public async Task<IEnumerable<HostedApplication>> GetApplications(List<string> appIds)
+    {
+        var ids = appIds.Select(a => new ObjectId(a));
+        return await dbContext.HostedApplications
+            .Where(h => ids.Contains(h.Id))
+            .ToListAsync();
+    }
+
     public async Task<HostedApplication?> GetByServiceToken(string serviceToken)
     {
         if (serviceToken == default)
