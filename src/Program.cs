@@ -11,6 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSerilog((s, lc) => lc.ReadFrom.Configuration(builder.Configuration));
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardLimit = 2;
+    options.KnownProxies.Clear();
+    options.AllowedHosts.Clear();
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.All;
+});
+
 builder.Services.AddOptions();
 builder.Configuration
     .AddJsonFile("secrets.json", optional: true, reloadOnChange: false)
@@ -57,6 +65,18 @@ builder.Services.AddScoped<CustomCookieAuthenticationEvents>();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+app.Use((context, next) =>
+{
+    // use protocol as forwarded by reverse proxy
+    // https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-5.0#when-it-isnt-possible-to-add-forwarded-headers-and-all-requests-are-secure-1
+    var scheme = context.Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? string.Empty;
+    if (!string.IsNullOrWhiteSpace(scheme))
+        context.Request.Scheme = scheme;
+    return next();
+});
+
+app.UseForwardedHeaders();
 
 app.UseStaticFiles();
 
