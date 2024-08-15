@@ -56,7 +56,6 @@ public class AppAuthService : IAuthService
                 AuthProperties = new AuthenticationProperties
                 {
                     AllowRefresh = true,
-                    IsPersistent = true,
                     IssuedUtc = DateTimeOffset.UtcNow,
                 }
             };

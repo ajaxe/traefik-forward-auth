@@ -52,8 +52,6 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     .AddCookie(o =>
     {
         o.LoginPath = "/login";
-        o.ExpireTimeSpan = TimeSpan.FromMinutes(10);
-        o.SlidingExpiration = true;
         o.ReturnUrlParameter = "returnUrl";
         o.AccessDeniedPath = "/login/AccessDenied";
         o.Cookie.Name = ".fwd-auth-custom";
