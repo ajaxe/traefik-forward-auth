@@ -18,6 +18,14 @@ public class AuthenticationResult
     public string UserId { get; set; }
     public bool Success { get; set; }
     public AuthenticationProperties AuthProperties { get; internal set; }
+
+    public static AuthenticationResult Fail()
+    {
+        return new AuthenticationResult
+        {
+            Success = false,
+        };
+    }
 }
 
 public class AuthCheckData

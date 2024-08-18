@@ -41,14 +41,16 @@ public class AppAuthService : IAuthService
 
             passwordMatch = true;
         }
-        else
+        else if (existing is not null)
         {
             passwordMatch = ValidatePassword(existing, password);
         }
 
+        AuthenticationResult result = AuthenticationResult.Fail();
+
         if (existing is not null && passwordMatch)
         {
-            return new AuthenticationResult
+            result = new AuthenticationResult
             {
                 Success = true,
                 UserId = existing.Id.ToString(),
@@ -60,13 +62,16 @@ public class AppAuthService : IAuthService
                 }
             };
         }
+        else if (existing is null)
+        {
+            logger.LogError("{@Username} does not exist", username);
+        }
         else
         {
-            return new AuthenticationResult
-            {
-                Success = false,
-            };
+            logger.LogError("{@Username} password did not match", username);
         }
+
+        return result;
     }
 
     public async Task<bool> ValidatePrincipalRefererUrl(IEnumerable<Claim> claims, string? referer)
