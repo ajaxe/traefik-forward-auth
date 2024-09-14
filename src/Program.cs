@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TraefikForwardAuth.Auth;
@@ -7,6 +8,7 @@ using TraefikForwardAuth.Configuration;
 using TraefikForwardAuth.Helpers;
 
 const string EnvVarPrefix = "APP_";
+string appPrefix = Environment.GetEnvironmentVariable($"{EnvVarPrefix}AppPathPrefix") ?? string.Empty;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,9 +53,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     //.AddScheme<BasicAuthenticationOptions, BasicAuthenticationHandler>(BasicAuthenticationOptions.SchemeName, null)
     .AddCookie(o =>
     {
-        o.LoginPath = "/login";
+        o.LoginPath = $"{appPrefix}/login";
         o.ReturnUrlParameter = "returnUrl";
-        o.AccessDeniedPath = "/login/AccessDenied";
+        o.AccessDeniedPath = $"{appPrefix}/login/AccessDenied";
         o.Cookie.Name = ".fwd-auth-custom";
         o.Cookie.IsEssential = true;
         o.EventsType = typeof(CustomCookieAuthenticationEvents);
@@ -66,6 +68,15 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
 
+if (!string.IsNullOrWhiteSpace(appPrefix))
+{
+    app.Use((context, next) =>
+    {
+        context.Request.PathBase = appPrefix;
+        return next();
+    });
+}
+
 app.Use((context, next) =>
 {
     // use protocol as forwarded by reverse proxy
@@ -76,7 +87,10 @@ app.Use((context, next) =>
     return next();
 });
 
-app.UseForwardedHeaders();
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.All
+});
 
 app.UseStaticFiles();
 

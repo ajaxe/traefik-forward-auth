@@ -98,8 +98,8 @@ public class LoginController : Controller
                 result.Principal,
                 result.AuthProperties);
 
-            logger.LogInformation("Setting 'PostLoginKey' to 1. User authenticated: {user}",
-                model.Username);
+            logger.LogInformation("Setting 'PostLoginKey' to 1. User authenticated: {user} {postLoginRedirect}",
+                model.Username, returnUrl);
             TempData.Put(PostLoginKey, "true");
 
             return LocalRedirect(returnUrl);
