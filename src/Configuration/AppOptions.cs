@@ -7,4 +7,5 @@ public class AppOptions
     public string Password { get; set; } = default!;
     public string MongoDbConnection { get; set; } = default!;
     public string DatabaseName { get; set; } = default!;
+    public string AuthCookieDomain { get; set; } = default!;
 }

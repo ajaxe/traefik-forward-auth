@@ -1,6 +1,8 @@
 using Amazon.Runtime;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Options;
+using TraefikForwardAuth.Configuration;
 
 namespace TraefikForwardAuth.Auth;
 
@@ -8,12 +10,15 @@ public class CustomCookieAuthenticationEvents : CookieAuthenticationEvents
 {
     private readonly IAuthService authService;
     private readonly ILogger<CustomCookieAuthenticationEvents> logger;
+    private readonly AppOptions options;
 
     public CustomCookieAuthenticationEvents(IAuthService authService,
+        IOptions<AppOptions> options,
         ILogger<CustomCookieAuthenticationEvents> logger)
     {
         this.authService = authService;
         this.logger = logger;
+        this.options = options.Value;
     }
 
     public override Task RedirectToLogin(RedirectContext<CookieAuthenticationOptions> context)
@@ -33,6 +38,11 @@ public class CustomCookieAuthenticationEvents : CookieAuthenticationEvents
     }
     public override Task SigningIn(CookieSigningInContext context)
     {
+        if (!string.IsNullOrWhiteSpace(options.AuthCookieDomain))
+        {
+            logger.LogInformation("Setting cookie {domain}", options.AuthCookieDomain);
+            context.CookieOptions.Domain = options.AuthCookieDomain;
+        }
         return base.SigningIn(context);
     }
 
