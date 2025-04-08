@@ -38,10 +38,13 @@ public class CustomCookieAuthenticationEvents : CookieAuthenticationEvents
     }
     public override Task SigningIn(CookieSigningInContext context)
     {
-        if (!string.IsNullOrWhiteSpace(options.AuthCookieDomain))
+        var reqDomain = context.Request.Host.Value;
+        var cookieDomain = options.GetAuthCookieDomain(reqDomain);
+
+        if (!string.IsNullOrWhiteSpace(cookieDomain))
         {
-            logger.LogInformation("Setting cookie {domain}", options.AuthCookieDomain);
-            context.CookieOptions.Domain = options.AuthCookieDomain;
+            logger.LogInformation("Setting cookie {domain}", cookieDomain);
+            context.CookieOptions.Domain = cookieDomain;
         }
         return base.SigningIn(context);
     }
