@@ -7,5 +7,5 @@ Helper application that adds a Cookie based login to Traefik hosted applications
 Use the following command
 
 ```bash
-docker build . -f build/Dockerfile --network=host --tag apogee-dev/traefik-forward-auth:local
+$env:DOCKER_BUILDKIT=1; docker build . -f build/Dockerfile --network=host --tag apogee-dev/traefik-forward-auth:local
 ```

@@ -1,107 +1,20 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.EntityFrameworkCore;
-using Serilog;
-using TraefikForwardAuth.Auth;
-using TraefikForwardAuth.Configuration;
-using TraefikForwardAuth.Helpers;
+using TraefikForwardAuth;
 
 const string EnvVarPrefix = "APP_";
 string appPrefix = Environment.GetEnvironmentVariable($"{EnvVarPrefix}AppPathPrefix") ?? string.Empty;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSerilog((s, lc) => lc.ReadFrom.Configuration(builder.Configuration));
-
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardLimit = 2;
-    options.KnownProxies.Clear();
-    options.AllowedHosts.Clear();
-    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.All;
-});
-
-builder.Services.AddOptions();
 builder.Configuration
     .AddJsonFile("secrets.json", optional: true, reloadOnChange: false)
     .AddEnvironmentVariables(prefix: EnvVarPrefix);
 
-builder.Services.AddHealthChecks();
+var startup = new Startup(builder.Configuration, builder.Environment);
 
-var appOptions = new AppOptions();
-builder.Configuration.GetSection(AppOptions.SectionName)
-    .Bind(appOptions);
-builder.Services.Configure<AppOptions>(
-    builder.Configuration.GetSection(AppOptions.SectionName)
-);
-
-builder.Services.AddDbContext<AppDbContext>(
-    o => o.UseMongoDB(appOptions.MongoDbConnection, appOptions.DatabaseName)
-);
-builder.Services.AddTransient<IHostedApplicationService, HostedApplicationService>();
-builder.Services.AddTransient<IAuthService, AppAuthService>();
-
-if (builder.Environment.IsProduction())
-{
-    builder.Services.AddDataProtection()
-        .SetApplicationName("TraefikForwardAuth")
-        .PersistKeysToFileSystem(new DirectoryInfo("/dpapi-keys/"));
-}
-
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    //.AddScheme<BasicAuthenticationOptions, BasicAuthenticationHandler>(BasicAuthenticationOptions.SchemeName, null)
-    .AddCookie(o =>
-    {
-        o.LoginPath = $"{appPrefix}/login";
-        o.ReturnUrlParameter = "returnUrl";
-        o.AccessDeniedPath = $"{appPrefix}/login/AccessDenied";
-        o.Cookie.Name = ".fwd-auth-custom";
-        o.Cookie.IsEssential = true;
-        o.EventsType = typeof(CustomCookieAuthenticationEvents);
-    });
-
-// Add services to the container.
-builder.Services.AddScoped<CustomCookieAuthenticationEvents>();
-builder.Services.AddControllersWithViews();
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+startup.ConfigureServices(builder.Services);
 
 var app = builder.Build();
 
-if (!string.IsNullOrWhiteSpace(appPrefix))
-{
-    app.Use((context, next) =>
-    {
-        context.Request.PathBase = appPrefix;
-        return next();
-    });
-}
-
-app.Use((context, next) =>
-{
-    // use protocol as forwarded by reverse proxy
-    // https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-5.0#when-it-isnt-possible-to-add-forwarded-headers-and-all-requests-are-secure-1
-    var scheme = context.Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? string.Empty;
-    if (!string.IsNullOrWhiteSpace(scheme))
-        context.Request.Scheme = scheme;
-    return next();
-});
-
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.All
-});
-
-app.UseStaticFiles();
-
-app.UseRouting();
-
-app.UseAuthorization();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
-app.MapHealthChecks("/healthcheck");
+startup.Configure(app);
 
 app.Run();

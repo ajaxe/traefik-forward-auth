@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine as builder
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS builder
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 RUN mkdir -p /home/app/
 WORKDIR /home/app/
