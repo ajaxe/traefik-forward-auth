@@ -12,6 +12,7 @@ namespace TraefikForwardAuth;
 
 public class Startup
 {
+    const string CorsSpecificDomain = "_CorsSpecificDomain";
     const string EnvVarPrefix = "APP_";
     string appPrefix = System.Environment.GetEnvironmentVariable($"{EnvVarPrefix}AppPathPrefix") ?? string.Empty;
     public Startup(ConfigurationManager configuration, IWebHostEnvironment environment)
@@ -43,6 +44,19 @@ public class Startup
         services.Configure<AppOptions>(
             Configuration.GetSection(AppOptions.SectionName)
         );
+
+        services.AddCors(opts =>
+        {
+            opts.AddDefaultPolicy(policy =>
+            {
+                var d = appOptions.AuthCookieDomain.Split(",", StringSplitOptions.RemoveEmptyEntries);
+                if (d.Length > 0)
+                    policy.WithOrigins(d.Select(s => $"https://*{s}").ToArray())
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .SetIsOriginAllowedToAllowWildcardSubdomains();
+            });
+        });
 
         services.AddDbContext<AppDbContext>(
             o => o.UseMongoDB(appOptions.MongoDbConnection, appOptions.DatabaseName)
@@ -104,6 +118,8 @@ public class Startup
         app.UseStaticFiles();
 
         app.UseRouting();
+
+        app.UseCors();
 
         app.UseAuthorization();
 
