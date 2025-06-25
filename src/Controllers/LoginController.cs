@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -107,5 +108,26 @@ public class LoginController : Controller
         else TempData.Put(LoginErrorKey, model.Error("Invalid username or password"));
 
         return Redirect("Index");
+    }
+
+    [HttpGet]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Introspect()
+    {
+        var result = await HttpContext.AuthenticateAsync();
+
+        if (!result.Succeeded)
+        {
+            logger.LogInformation("Introspect failed, user not authenticated");
+            return Forbid();
+        }
+
+        return Json(new IntrospectResponse
+        {
+            Active = true,
+            Username = result.Principal.FindFirstValue(ClaimTypes.Name),
+            IssuedUtc = result.Ticket.Properties
+                .IssuedUtc?.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo)
+        });
     }
 }

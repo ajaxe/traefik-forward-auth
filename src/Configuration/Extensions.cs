@@ -6,6 +6,10 @@ public static class Extensions
     {
         if (string.IsNullOrWhiteSpace(options.AuthCookieDomain))
         {
+            if (targetDomain.StartsWith("localhost:", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty; // No cookie domain for localhost
+            }
             return targetDomain;
         }
 
