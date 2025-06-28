@@ -1,8 +1,10 @@
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Serilog;
 using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Configuration;
@@ -12,6 +14,7 @@ namespace TraefikForwardAuth;
 
 public class Startup
 {
+    private const string AppName = "TraefikForwardAuth";
     const string CorsSpecificDomain = "_CorsSpecificDomain";
     const string EnvVarPrefix = "APP_";
     string appPrefix = System.Environment.GetEnvironmentVariable($"{EnvVarPrefix}AppPathPrefix") ?? string.Empty;
@@ -32,7 +35,7 @@ public class Startup
             options.ForwardLimit = 2;
             options.KnownProxies.Clear();
             options.AllowedHosts.Clear();
-            options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.All;
+            options.ForwardedHeaders = ForwardedHeaders.All;
         });
 
         services.AddOptions();
@@ -62,18 +65,36 @@ public class Startup
             o => o.UseMongoDB(appOptions.MongoDbConnection, appOptions.DatabaseName)
         );
 
+        services.AddStackExchangeRedisCache(o =>
+        {
+            o.InstanceName = $"{AppName}:{Environment.EnvironmentName}:";
+            o.Configuration = Configuration.GetConnectionString("cache");
+        });
+
         services.AddTransient<IHostedApplicationService, HostedApplicationService>();
         services.AddTransient<IAuthService, AppAuthService>();
 
         if (Environment.IsProduction())
         {
             services.AddDataProtection()
-                .SetApplicationName("TraefikForwardAuth")
+                .SetApplicationName(AppName)
                 .PersistKeysToFileSystem(new DirectoryInfo("/dpapi-keys/"));
         }
 
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(o =>
+        ConfigureAuthServices(services);
+
+        services.AddScoped<CustomCookieAuthenticationEvents>();
+        services.AddControllersWithViews();
+        services.AddHttpContextAccessor();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+    }
+
+    private void ConfigureAuthServices(IServiceCollection services)
+    {
+        services.AddSingleton<ITicketStore, AppTicketStore>();
+        services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
+        .Configure<IDistributedCache, ILogger<AppTicketStore>>(
+            (o, cache, logger) =>
             {
                 o.LoginPath = $"{appPrefix}/login";
                 o.ReturnUrlParameter = "returnUrl";
@@ -81,13 +102,14 @@ public class Startup
                 o.Cookie.Name = ".fwd-auth-custom";
                 o.Cookie.IsEssential = true;
                 o.EventsType = typeof(CustomCookieAuthenticationEvents);
+
+                o.SessionStore = new AppTicketStore(cache, TicketSerializer.Default, logger);
             });
 
-        services.AddScoped<CustomCookieAuthenticationEvents>();
-        services.AddControllersWithViews();
-        services.AddHttpContextAccessor();
-        services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddCookie();
     }
+
     public void Configure(IApplicationBuilder app)
     {
 
