@@ -52,8 +52,8 @@ public class Startup
         {
             opts.AddDefaultPolicy(policy =>
             {
-                var d = appOptions.AuthCookieDomain.Split(",", StringSplitOptions.RemoveEmptyEntries);
-                if (d.Length > 0)
+                var d = appOptions.GetOrderedAuthDomains();
+                if (d.Count() > 0)
                     policy.WithOrigins(d.Select(s => $"https://*{s}").ToArray())
                         .AllowAnyHeader()
                         .AllowAnyMethod()
@@ -81,7 +81,7 @@ public class Startup
                 .PersistKeysToFileSystem(new DirectoryInfo("/dpapi-keys/"));
         }
 
-        ConfigureAuthServices(services);
+        ConfigureAuthServices(services, appOptions);
 
         services.AddScoped<CustomCookieAuthenticationEvents>();
         services.AddControllersWithViews();
@@ -89,25 +89,50 @@ public class Startup
         services.AddExceptionHandler<GlobalExceptionHandler>();
     }
 
-    private void ConfigureAuthServices(IServiceCollection services)
+    private void ConfigureAuthServices(IServiceCollection services, AppOptions appOptions)
     {
         services.AddSingleton<ITicketStore, AppTicketStore>();
-        services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
-        .Configure<IDistributedCache, ILogger<AppTicketStore>>(
-            (o, cache, logger) =>
+
+        var authBuilder = services.AddAuthentication(options =>
+        {
+            options.DefaultScheme = "app_scheme.dynamic";
+            options.DefaultChallengeScheme = "app_scheme.dynamic";
+        })
+        .AddPolicyScheme("app_scheme.dynamic", "Dynamic cookie scheme", options =>
+        {
+            options.ForwardDefaultSelector = context =>
             {
-                o.LoginPath = $"{appPrefix}/login";
-                o.ReturnUrlParameter = "returnUrl";
-                o.AccessDeniedPath = $"{appPrefix}/login/AccessDenied";
-                o.Cookie.Name = ".fwd-auth-custom";
-                o.Cookie.IsEssential = true;
-                o.EventsType = typeof(CustomCookieAuthenticationEvents);
+                string host = context.Request.Host.Host;
+                foreach (var domain in appOptions.GetOrderedAuthDomains())
+                {
+                    if (host.Contains(domain, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return appOptions.GetAuthSchemeName(domain);
+                    }
+                }
 
-                o.SessionStore = new AppTicketStore(cache, TicketSerializer.Default, logger);
-            });
+                throw new InvalidOperationException("Auth scheme not supported for invalid host: " + host);
+            };
+        });
 
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie();
+        foreach (var domain in appOptions.GetOrderedAuthDomains())
+        {
+            var schemeName = appOptions.GetAuthSchemeName(domain);
+            services.AddOptions<CookieAuthenticationOptions>(schemeName)
+            .Configure<IDistributedCache, ILogger<AppTicketStore>>(
+                (o, cache, logger) =>
+                {
+                    o.LoginPath = $"{appPrefix}/login";
+                    o.ReturnUrlParameter = "returnUrl";
+                    o.AccessDeniedPath = $"{appPrefix}/login/AccessDenied";
+                    o.Cookie.Name = $".fwd-auth-{domain}";
+                    o.Cookie.IsEssential = true;
+                    o.EventsType = typeof(CustomCookieAuthenticationEvents);
+
+                    o.SessionStore = new AppTicketStore(cache, TicketSerializer.Default, logger);
+                });
+            authBuilder.AddCookie(schemeName);
+        }
     }
 
     public void Configure(IApplicationBuilder app)
@@ -151,7 +176,7 @@ public class Startup
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
 
-            endpoints.MapHealthChecks("/healthcheck");
+            endpoints.MapHealthChecks("/healthcheck").AllowAnonymous();
         });
     }
 }

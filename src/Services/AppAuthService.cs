@@ -3,9 +3,10 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MongoDB.Bson;
+using TraefikForwardAuth.Configuration;
 using TraefikForwardAuth.Helpers;
 
 namespace TraefikForwardAuth.Services;
@@ -16,17 +17,24 @@ public class AppAuthService : IAuthService
     private readonly IHostedApplicationService appService;
     private readonly AppDbContext dbContext;
     private readonly ILogger<AppAuthService> logger;
+    private readonly AppOptions appOptions;
 
     public AppAuthService(IHostedApplicationService appService,
-        AppDbContext dbContext, ILogger<AppAuthService> logger)
+        AppDbContext dbContext,
+        IOptions<AppOptions> options,
+        ILogger<AppAuthService> logger)
     {
         this.appService = appService;
         this.dbContext = dbContext;
         this.logger = logger;
+        this.appOptions = options.Value;
     }
 
-    public async Task<AuthenticationResult> Authenticate(string username, string password)
+    public async Task<AuthenticationResult> Authenticate(AuthenticateData authenticateData)
     {
+        var username = authenticateData.Username;
+        var password = authenticateData.Password;
+
         // add password hashing later
         var existing = await dbContext.AppUsers
             .FirstOrDefaultAsync(u => u.UserName == username);
@@ -54,7 +62,7 @@ public class AppAuthService : IAuthService
             {
                 Success = true,
                 UserId = existing.Id.ToString(),
-                Principal = BuildPrincipal(existing),
+                Principal = BuildPrincipal(existing, authenticateData),
                 AuthProperties = new AuthenticationProperties
                 {
                     AllowRefresh = true,
@@ -173,7 +181,7 @@ public class AppAuthService : IAuthService
         return string.Empty;
     }
 
-    private ClaimsPrincipal BuildPrincipal(AppUser existing)
+    private ClaimsPrincipal BuildPrincipal(AppUser existing, AuthenticateData authCheckData)
     {
         var claims = new List<Claim>
             {
@@ -190,8 +198,9 @@ public class AppAuthService : IAuthService
                             .Select(r => new Claim(ClaimTypes.Role, r)));
         }
 
-        var claimsIdentity = new ClaimsIdentity(
-            claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var authScheme = appOptions.GetAuthSchemeName(authCheckData.RequestingDomain);
+
+        var claimsIdentity = new ClaimsIdentity(claims, authScheme);
 
         return new ClaimsPrincipal(claimsIdentity);
     }

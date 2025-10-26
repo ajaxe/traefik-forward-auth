@@ -13,10 +13,7 @@ public static class Extensions
             return targetDomain;
         }
 
-        var domains = options.AuthCookieDomain
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .OrderByDescending(d => d.Length)
-            .ToArray();
+        var domains = options.GetOrderedAuthDomains();
 
         foreach (var domain in domains)
         {
@@ -27,5 +24,15 @@ public static class Extensions
         }
 
         return targetDomain;
+    }
+    public static string GetAuthSchemeName(this AppOptions options, string targetDomain)
+    {
+        return $"AuthScheme:{GetAuthCookieDomain(options, targetDomain)}";
+    }
+    public static IEnumerable<string> GetOrderedAuthDomains(this AppOptions options)
+    {
+        return options.AuthCookieDomain.Split(",", StringSplitOptions.RemoveEmptyEntries)
+            .OrderByDescending(d => d.Length)
+            .ToArray();
     }
 }

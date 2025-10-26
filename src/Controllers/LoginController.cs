@@ -1,13 +1,9 @@
-using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using MongoDB.Bson;
 using TraefikForwardAuth.Auth;
-using TraefikForwardAuth.Helpers;
 using TraefikForwardAuth.Models;
 
 namespace TraefikForwardAuth.Controllers;
@@ -52,8 +48,9 @@ public class LoginController : Controller
 
     public async Task<IActionResult> Logout()
     {
-        await HttpContext.SignOutAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme);
+        if (this.User.Identity!.IsAuthenticated)
+            await HttpContext.SignOutAsync(User.Identity.AuthenticationType);
+
         return RedirectToAction("Index", "Home");
     }
 
@@ -116,17 +113,22 @@ public class LoginController : Controller
         }
         var returnUrl = TempData.Get<string>(ReturnUrlKey) ?? "/";
 
-        var result = await authService.Authenticate(model.Username, model.Password);
+        var result = await authService.Authenticate(new AuthenticateData
+        {
+            Username = model.Username,
+            Password = model.Password,
+            RequestingDomain = this.Request.Host.Host,
+        });
 
         if (result.Success)
         {
             await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
+                result.Principal.Identity!.AuthenticationType,
                 result.Principal,
                 result.AuthProperties);
 
-            logger.LogInformation("Setting 'PostLoginKey' to 1. User authenticated: {user} {postLoginRedirect}",
-                model.Username, returnUrl);
+            logger.LogInformation("Setting 'PostLoginKey' to 1. User authenticated: {@Username} {@PostLoginRedirect} {@AuthenticationType}",
+                model.Username, returnUrl, result.Principal.Identity!.AuthenticationType);
             TempData.Put(PostLoginKey, "true");
 
             return LocalRedirect(returnUrl);

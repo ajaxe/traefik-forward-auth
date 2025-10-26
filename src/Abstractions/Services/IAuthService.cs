@@ -7,7 +7,7 @@ namespace TraefikForwardAuth.Abstractions.Services;
 public interface IAuthService
 {
     Task<string> AuthCheck(AuthCheckData authCheckData);
-    Task<AuthenticationResult> Authenticate(string username, string password);
+    Task<AuthenticationResult> Authenticate(AuthenticateData authenticateData);
 
     Task<bool> ValidatePrincipalRefererUrl(IEnumerable<Claim> claims, string? referer);
 }
@@ -32,4 +32,11 @@ public class AuthCheckData
 {
     public string ServiceToken { get; internal set; } = default!;
     public IEnumerable<Claim> Claims { get; internal set; } = default!;
+}
+
+public class AuthenticateData
+{
+    public string Username { get; internal set; } = default!;
+    public string Password { get; internal set; } = default!;
+    public string RequestingDomain { get; internal set; } = default!;
 }
