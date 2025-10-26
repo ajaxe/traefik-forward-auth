@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using MongoDB.Bson;
+using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Helpers;
 using TraefikForwardAuth.Models;
 
@@ -16,6 +17,7 @@ public class LoginController : Controller
     private const string LoginErrorKey = "loginError";
     private const string ReturnUrlKey = "returnUrl";
     private const string PostLoginKey = "postLogin";
+    private static string ServiceTokenHeaderKey => CustomCookieAuthenticationEvents.ServiceTokenHeaderKey;
     private readonly ILogger<LoginController> logger;
 
     public LoginController(ILogger<LoginController> logger)
@@ -24,6 +26,17 @@ public class LoginController : Controller
     }
     public IActionResult Index(string? returnUrl = null)
     {
+        if (this.Request.Headers.TryGetValue(ServiceTokenHeaderKey, out var tokenHeader)
+            && tokenHeader.Any())
+        {
+            var token = tokenHeader.First();
+            logger.LogInformation("Login Index: {@ServiceTokenHeader} value: {@token}", ServiceTokenHeaderKey, token);
+        }
+        else
+        {
+            logger.LogInformation("Login Index: {@ServiceTokenHeader} is not present. Request Header: {headers}",
+                ServiceTokenHeaderKey, this.Request.Headers);
+        }
         var vm = TempData.Get<LoginViewModel>(LoginErrorKey) ?? new LoginViewModel();
         if (!string.IsNullOrWhiteSpace(returnUrl))
         {
@@ -45,7 +58,7 @@ public class LoginController : Controller
     }
 
     [Authorize]
-    public async Task<IActionResult> Check(string token,
+    public async Task<IActionResult> Check(string? token,
         [FromServices] IAuthService authService)
     {
         if (!this.User.Identity!.IsAuthenticated)
@@ -54,9 +67,22 @@ public class LoginController : Controller
             return Forbid();
         }
 
+        if (Request.Headers.TryGetValue(ServiceTokenHeaderKey, out var tokenHeader)
+            && tokenHeader.Any())
+        {
+            token = tokenHeader.First();
+            logger.LogInformation("{@ServiceTokenHeader} value: {@token}", ServiceTokenHeaderKey, token);
+        }
+        else
+        {
+            logger.LogInformation("{@ServiceTokenHeader} is not present. Request Header: {headers}",
+                ServiceTokenHeaderKey, this.Request.Headers);
+        }
+
+
         string serviceUrl = await authService.AuthCheck(new AuthCheckData
         {
-            ServiceToken = token,
+            ServiceToken = token ?? string.Empty,
             Claims = User.Claims,
         });
 
@@ -126,8 +152,7 @@ public class LoginController : Controller
         {
             Active = true,
             Username = result.Principal.FindFirstValue(ClaimTypes.Name),
-            IssuedUtc = result.Ticket.Properties
-                .IssuedUtc?.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", DateTimeFormatInfo.InvariantInfo)
+            IssuedUtc = result.Ticket.Properties.IssuedUtc.GetValueOrDefault()
         });
     }
 }
