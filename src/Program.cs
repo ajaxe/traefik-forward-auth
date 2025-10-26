@@ -1,13 +1,11 @@
 using TraefikForwardAuth;
 
-const string EnvVarPrefix = "APP_";
-string appPrefix = Environment.GetEnvironmentVariable($"{EnvVarPrefix}AppPathPrefix") ?? string.Empty;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false)
     .AddJsonFile("secrets.json", optional: true, reloadOnChange: false)
-    .AddEnvironmentVariables(prefix: EnvVarPrefix);
+    .AddEnvironmentVariables(prefix: Startup.EnvVarPrefix);
 
 var startup = new Startup(builder.Configuration, builder.Environment);
 

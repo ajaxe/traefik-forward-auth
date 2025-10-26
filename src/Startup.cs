@@ -15,8 +15,7 @@ namespace TraefikForwardAuth;
 public class Startup
 {
     private const string AppName = "TraefikForwardAuth";
-    const string CorsSpecificDomain = "_CorsSpecificDomain";
-    const string EnvVarPrefix = "APP_";
+    public const string EnvVarPrefix = "APP_";
     string appPrefix = System.Environment.GetEnvironmentVariable($"{EnvVarPrefix}AppPathPrefix") ?? string.Empty;
     public Startup(ConfigurationManager configuration, IWebHostEnvironment environment)
     {
@@ -81,58 +80,11 @@ public class Startup
                 .PersistKeysToFileSystem(new DirectoryInfo("/dpapi-keys/"));
         }
 
-        ConfigureAuthServices(services, appOptions);
+        services.AddDynamicCookieAuth(appOptions, appPrefix);
 
-        services.AddScoped<CustomCookieAuthenticationEvents>();
         services.AddControllersWithViews();
         services.AddHttpContextAccessor();
         services.AddExceptionHandler<GlobalExceptionHandler>();
-    }
-
-    private void ConfigureAuthServices(IServiceCollection services, AppOptions appOptions)
-    {
-        services.AddSingleton<ITicketStore, AppTicketStore>();
-
-        var authBuilder = services.AddAuthentication(options =>
-        {
-            options.DefaultScheme = "app_scheme.dynamic";
-            options.DefaultChallengeScheme = "app_scheme.dynamic";
-        })
-        .AddPolicyScheme("app_scheme.dynamic", "Dynamic cookie scheme", options =>
-        {
-            options.ForwardDefaultSelector = context =>
-            {
-                string host = context.Request.Host.Host;
-                foreach (var domain in appOptions.GetOrderedAuthDomains())
-                {
-                    if (host.Contains(domain, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return appOptions.GetAuthSchemeName(domain);
-                    }
-                }
-
-                throw new InvalidOperationException("Auth scheme not supported for invalid host: " + host);
-            };
-        });
-
-        foreach (var domain in appOptions.GetOrderedAuthDomains())
-        {
-            var schemeName = appOptions.GetAuthSchemeName(domain);
-            services.AddOptions<CookieAuthenticationOptions>(schemeName)
-            .Configure<IDistributedCache, ILogger<AppTicketStore>>(
-                (o, cache, logger) =>
-                {
-                    o.LoginPath = $"{appPrefix}/login";
-                    o.ReturnUrlParameter = "returnUrl";
-                    o.AccessDeniedPath = $"{appPrefix}/login/AccessDenied";
-                    o.Cookie.Name = $".fwd-auth-{domain}";
-                    o.Cookie.IsEssential = true;
-                    o.EventsType = typeof(CustomCookieAuthenticationEvents);
-
-                    o.SessionStore = new AppTicketStore(cache, TicketSerializer.Default, logger);
-                });
-            authBuilder.AddCookie(schemeName);
-        }
     }
 
     public void Configure(IApplicationBuilder app)
