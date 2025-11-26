@@ -1,10 +1,11 @@
-
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
+using MongoDB.Driver;
+using MongoDB.Driver.Core.Extensions.DiagnosticSources;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 using TraefikForwardAuth.Auth;
 using TraefikForwardAuth.Configuration;
@@ -28,6 +29,8 @@ public class Startup
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddSerilog((s, lc) => lc.ReadFrom.Configuration(Configuration));
+
+        AddOpenTelemetry(services);
 
         services.Configure<ForwardedHeadersOptions>(options =>
         {
@@ -60,8 +63,14 @@ public class Startup
             });
         });
 
+        services.AddSingleton<IMongoClient>(sp =>
+        {
+            var clientSettings = MongoClientSettings.FromConnectionString(appOptions.MongoDbConnection);
+            clientSettings.ClusterConfigurator = cb => cb.Subscribe(new DiagnosticsActivityEventSubscriber());
+            return new MongoClient(clientSettings);
+        });
         services.AddDbContext<AppDbContext>(
-            o => o.UseMongoDB(appOptions.MongoDbConnection, appOptions.DatabaseName)
+            (sp, o) => o.UseMongoDB(sp.GetRequiredService<IMongoClient>(), appOptions.DatabaseName)
         );
 
         services.AddStackExchangeRedisCache(o =>
@@ -85,6 +94,66 @@ public class Startup
         services.AddControllersWithViews();
         services.AddHttpContextAccessor();
         services.AddExceptionHandler<GlobalExceptionHandler>();
+    }
+
+    private void AddOpenTelemetry(IServiceCollection services)
+    {
+        var appName = "TraefikForwardAuth";
+        var otelEndpoint = Configuration["OTLP_ENDPOINT_URL"]?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(otelEndpoint))
+        {
+            Log.Warning("OTLP_ENDPOINT_URL is not set, OpenTelemetry will not be configured.");
+            return;
+        }
+
+        var otel = services.AddOpenTelemetry()
+        .ConfigureResource(resource =>
+        {
+            resource.AddService(serviceName: appName);
+            var globalOpenTelemetryAttributes = new List<KeyValuePair<string, object>>
+            {
+                new KeyValuePair<string, object>("env", Environment.EnvironmentName),
+                new KeyValuePair<string, object>("service.name", appName),
+                new KeyValuePair<string, object>("service.version", "1.0.0"),
+                new KeyValuePair<string, object>("service.instanceId", System.Environment.MachineName),
+            };
+            resource.AddAttributes(globalOpenTelemetryAttributes);
+        })
+        .WithMetrics(metrics => metrics
+            .AddOtlpExporter(otlpOptions =>
+            {
+                otlpOptions.Endpoint = new Uri(otelEndpoint);
+            })
+            // Metrics provider from OpenTelemetry
+            .AddAspNetCoreInstrumentation()
+            .AddMeter("ApogeeDev.IdentityProvider")
+            // Metrics provides by ASP.NET Core in .NET 8
+            .AddMeter("Microsoft.AspNetCore.Hosting")
+            .AddMeter("Microsoft.AspNetCore.Server.Kestrel")
+            .AddPrometheusExporter())
+        .WithTracing(tracing =>
+        {
+            tracing.AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource(appName)
+                .AddSource("MongoDB.Driver.Core.Extensions.DiagnosticSources")
+                .AddOtlpExporter(otlpOptions =>
+                {
+                    otlpOptions.Endpoint = new Uri(otelEndpoint);
+                })
+                .AddEntityFrameworkCoreInstrumentation(options =>
+                {
+                    options.EnrichWithIDbCommand = (activity, command) =>
+                    {
+                        var stateDisplayName = $"{command.CommandType} main";
+                        activity.DisplayName = stateDisplayName;
+                        activity.SetTag("db.name", stateDisplayName);
+                    };
+                });
+
+            if (Environment.IsDevelopment())
+                tracing.AddConsoleExporter();
+        });
     }
 
     public void Configure(IApplicationBuilder app)
