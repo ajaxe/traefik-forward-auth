@@ -1,26 +1,17 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Caching.Distributed;
+using TraefikForwardAuth.Helpers;
+using ZstdSharp.Unsafe;
 
 namespace TraefikForwardAuth.Services;
 
-public class AppTicketStore : ITicketStore
+public class AppTicketStore(IDistributedCache cache,
+        IDataSerializer<AuthenticationTicket> serializer,
+        ILogger<AppTicketStore> logger) : ITicketStore
 {
     private const string KeyPrefix = "ckticket:";
     private const int ExpirationIntervalDays = 1;
-    private readonly IDistributedCache cache;
-    private readonly IDataSerializer<AuthenticationTicket> serializer;
-    private readonly ILogger<AppTicketStore> logger;
-
-    public AppTicketStore(IDistributedCache cache,
-        IDataSerializer<AuthenticationTicket> serializer,
-        ILogger<AppTicketStore> logger)
-    {
-        this.cache = cache;
-        this.serializer = serializer;
-        this.logger = logger;
-    }
-
     public Task RemoveAsync(string key)
     {
         return cache.RemoveAsync(GetKey(key));
@@ -33,6 +24,7 @@ public class AppTicketStore : ITicketStore
 
     public async Task<AuthenticationTicket?> RetrieveAsync(string key)
     {
+        using var _ = ActivitySources.AppActivitySource.StartActivity("AppTicketStore.RetrieveAsync");
         var bytes = await cache.GetAsync(GetKey(key));
         if (bytes == null || bytes.Length == 0)
         {
@@ -49,13 +41,14 @@ public class AppTicketStore : ITicketStore
     }
     private Task StoreInternalAsync(string key, AuthenticationTicket ticket)
     {
+        using var _ = ActivitySources.AppActivitySource.StartActivity("AppTicketStore.StoreInternalAsync");
         var bytes = serializer.Serialize(ticket);
         return cache.SetAsync(key, bytes, GetCacheEntryOptions());
     }
-    private string GenerateKey() => Guid.NewGuid().ToString();
-    private string GetKey(string key) => $"{KeyPrefix}{key}";
+    private static string GenerateKey() => Guid.NewGuid().ToString();
+    private static string GetKey(string key) => $"{KeyPrefix}{key}";
 
-    private DistributedCacheEntryOptions GetCacheEntryOptions()
+    private static DistributedCacheEntryOptions GetCacheEntryOptions()
         => new DistributedCacheEntryOptions
         {
             AbsoluteExpiration = DateTimeOffset.UtcNow.AddDays(ExpirationIntervalDays),

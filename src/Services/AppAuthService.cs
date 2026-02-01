@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -149,17 +150,21 @@ public class AppAuthService : IAuthService
 
     public async Task<string> AuthCheck(AuthCheckData authCheckData)
     {
+        using var activity = ActivitySources.AppActivitySource.StartActivity(nameof(AuthCheck),
+            ActivityKind.Server);
+
         var existingService = await appService.GetByServiceToken(authCheckData.ServiceToken);
         if (existingService is null || !existingService.Active)
         {
-            logger.LogInformation("Invalid service. {@data}",
-            new
-            {
-                ServiceActive = existingService?.Active,
-                authCheckData.ServiceToken,
-                ClaimCount = authCheckData.Claims.Count(),
-                Claims = authCheckData.Claims.Select(c => new { c.Type, c.Value })
-            });
+            if (logger.IsEnabled(LogLevel.Information))
+                logger.LogInformation("Invalid service. {@data}",
+                    new
+                    {
+                        ServiceActive = existingService?.Active,
+                        authCheckData.ServiceToken,
+                        ClaimCount = authCheckData.Claims.Count(),
+                        Claims = authCheckData.Claims.Select(c => new { c.Type, c.Value })
+                    });
             return string.Empty;
         }
 
@@ -185,9 +190,9 @@ public class AppAuthService : IAuthService
     {
         var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, existing.UserName),
-                new Claim(ClaimTypes.PrimarySid, existing.Id.ToString()),
-                new Claim(CustomClaimTypes.AppIds, existing.Applications
+                new (ClaimTypes.Name, existing.UserName),
+                new (ClaimTypes.PrimarySid, existing.Id.ToString()),
+                new (CustomClaimTypes.AppIds, existing.Applications
                                                     .Select(a => a.HostAppId.ToString())
                                                     .ToJson()),
             };

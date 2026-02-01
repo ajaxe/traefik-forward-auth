@@ -109,13 +109,13 @@ public class Startup
         var otel = services.AddOpenTelemetry()
         .ConfigureResource(resource =>
         {
-            resource.AddService(serviceName: appName);
+            resource.AddService(serviceName: ActivitySources.AppName);
             var globalOpenTelemetryAttributes = new List<KeyValuePair<string, object>>
             {
-                new KeyValuePair<string, object>("env", Environment.EnvironmentName),
-                new KeyValuePair<string, object>("service.name", appName),
-                new KeyValuePair<string, object>("service.version", "1.0.0"),
-                new KeyValuePair<string, object>("service.instanceId", System.Environment.MachineName),
+                new ("env", Environment.EnvironmentName),
+                new ("service.name", ActivitySources.AppName),
+                new ("service.version", "1.0.0"),
+                new ("service.instanceId", System.Environment.MachineName),
             };
             resource.AddAttributes(globalOpenTelemetryAttributes);
         })
@@ -135,7 +135,7 @@ public class Startup
         {
             tracing.AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddSource(appName)
+                .AddSource(ActivitySources.AppName)
                 .AddSource("MongoDB.Driver.Core.Extensions.DiagnosticSources")
                 .AddOtlpExporter(otlpOptions =>
                 {
